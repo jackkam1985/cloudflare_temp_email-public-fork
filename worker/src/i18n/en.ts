@@ -1,11 +1,15 @@
 import { LocaleMessages } from "./type";
 
 const messages: LocaleMessages = {
+    InvalidRequestBodyMsg: "Invalid request body",
+    InvalidMailIdMsg: "Invalid mail ID",
+    MailNotFoundMsg: "Mail not found",
     CustomAuthPasswordMsg: "You have enabled the private site password, please provide the password",
     UserTokenExpiredMsg: "Your token has expired, please login again",
     UserAcceesTokenExpiredMsg: "Your access token has expired, please refresh the page",
     UserRoleIsNotAdminMsg: "Your user role is not admin, no access to visit this page",
     NeedAdminPasswordMsg: "You need to provide the admin password to access this page",
+    AdminApiIpNotAllowedMsg: "Your IP address isn't on the admin whitelist",
 
     KVNotAvailableMsg: "KV is not available, please contact the administrator",
     DBNotAvailableMsg: "DB is not available, please contact the administrator",
@@ -20,6 +24,10 @@ const messages: LocaleMessages = {
     InvalidAddressMsg: "Invalid address",
     InvalidAddressCredentialMsg: "Invalid address credential",
     UserDeleteEmailDisabledMsg: "User delete address/email is disabled, please contact the administrator",
+
+    RedeemCodeUnavailableMsg: "The redemption code is invalid, used, or expired",
+    RedeemCodeInvalidMsg: "Invalid redemption code configuration",
+    RedeemRoleConflictMsg: "The user already has a different role",
 
     UserNotFoundMsg: "User not found",
     UserAlreadyExistsMsg: "User already exists, please login",
@@ -57,6 +65,7 @@ const messages: LocaleMessages = {
     NameTooShortMsg: "Name is too short",
     NameTooLongMsg: "Name is too long",
     InvalidDomainMsg: "Invalid domain",
+    RandomSubdomainNotAllowedMsg: "Random subdomain is not enabled for this domain",
     AddressAlreadyExistsMsg: "Address already exists",
     MaxAddressCountReachedMsg: "Max address count reached",
     AddressNotBindedMsg: "Address is not binded",
@@ -70,15 +79,19 @@ const messages: LocaleMessages = {
     ContentEmptyMsg: "Content is empty",
     AlreadyRequestedMsg: "Already requested",
     EnableResendOrSmtpMsg: "Please enable resend or smtp for this domain",
-    EnableResendOrSmtpWithVerifiedMsg: "Please enable resend or smtp for this domain, or add recipient to verified address list",
+    EnableResendOrSmtpOrSendMailMsg: "Please enable resend, smtp or SEND_MAIL for this domain",
+    ServerSendMailDailyLimitMsg: "Server daily send quota has been reached",
+    ServerSendMailMonthlyLimitMsg: "Server monthly send quota has been reached",
     InvalidToMailMsg: "Invalid recipient address",
 
     // Admin related
     InvalidAddressIdMsg: "Invalid address_id",
     EnableKVMsg: "Please enable KV first",
     EnableSendMailMsg: "Please enable SEND_MAIL first",
+    EnableSendMailForDomainMsg: "Please enable SEND_MAIL for this domain first",
     InvalidCleanupConfigMsg: "Invalid cleanType or cleanDays",
     InvalidCleanTypeMsg: "Invalid cleanType",
+    CleanupFailedMsg: "Cleanup failed. Check your cleanup settings; inactive-address cleanup is unavailable when address activity updates are disabled.",
     EnableKVForMailVerifyMsg: "Please enable KV first if you want to enable mail verify",
     VerifyMailDomainInvalidMsg: "VerifyMailSender domain must be in",
     InvalidMaxAddressCountMsg: "Invalid maxAddressCount",
@@ -170,6 +183,12 @@ const messages: LocaleMessages = {
     TgNoPermissionViewMailMsg: "No permission to view this mail",
     TgBotTokenRequiredMsg: "TELEGRAM_BOT_TOKEN is required",
     TgLangFeatureDisabledMsg: "Language setting feature is disabled. System default language is used.",
+    TgAiExtractResultMsg: "AI extracted",
+    TgAiExtractAuthCodeMsg: "Verification code",
+    TgAiExtractAuthLinkMsg: "Verification link",
+    TgAiExtractServiceLinkMsg: "Service link",
+    TgAiExtractSubscriptionLinkMsg: "Subscription link",
+    TgAiExtractOtherLinkMsg: "Other link",
 }
 
 export default messages;

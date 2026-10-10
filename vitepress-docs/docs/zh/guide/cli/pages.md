@@ -9,6 +9,12 @@
 
 ## 前后端分离部署
 
+> [!warning] 重要：SPA 模式
+> 本项目是单页应用（SPA）。如果你通过 Cloudflare 控制台手动上传部署，**必须在高级选项中将「未找到处理」设置为 `Single-page application (SPA)`**，否则刷新页面或直接访问 `/admin` 等子路径时会返回 404。
+> 通过 CLI（`wrangler pages deploy`）部署时会自动处理，无需额外配置。
+>
+> ![pages spa setting](/ui_install/pages-spa-setting.jpg)
+
 第一次部署会提示创建项目, `production` 分支请填写 `production`
 
 ```bash
@@ -22,6 +28,12 @@ cp .env.example .env.prod
 将 `VITE_API_BASE` 修改为上一步创建的 `worker` 的 `url`, 不要在末尾加 `/`
 
 例如: `VITE_API_BASE=https://xxx.xxx.workers.dev`
+
+可通过 `VITE_DEFAULT_LANG` 设置前端默认语言，支持 `zh`、`en`、`es`、`pt-BR`、`ja`、`de`，未配置或配置无效时使用 `zh`。
+
+例如: `VITE_DEFAULT_LANG=en`
+
+其他配置项请查看 [前端变量说明](/zh/guide/frontend-vars)。
 
 ```bash
 pnpm build --emptyOutDir
@@ -40,6 +52,8 @@ pnpm run deploy
 第一次部署会提示创建项目, `production` 分支请填写 `production`
 
 如果你的 worker 后端 名称不为 `cloudflare_temp_email` 请修改 `pages/wrangler.toml`
+
+如需设置默认语言，在 `frontend/.env.pages.local` 中添加 `VITE_DEFAULT_LANG=en`。同域请求不需要设置 `VITE_API_BASE`，其他配置项请查看 [前端变量说明](/zh/guide/frontend-vars)。
 
 ```bash
 cd frontend

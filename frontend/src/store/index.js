@@ -24,10 +24,13 @@ export const useGlobalState = createGlobalState(
             disableAnonymousUserCreateEmail: false,
             disableCustomAddressName: false,
             enableUserDeleteEmail: false,
+            enableMailReadStatus: false,
             enableAutoReply: false,
             enableIndexAbout: false,
             /** @type {string[]} */
             defaultDomains: [],
+            /** @type {string[]} */
+            randomSubdomainDomains: [],
             /** @type {Array<{label: string, value: string}>} */
             domains: [],
             copyright: 'Dream Hunter',
@@ -36,8 +39,24 @@ export const useGlobalState = createGlobalState(
             isS3Enabled: false,
             enableSendMail: false,
             showGithub: true,
+            showGithubForUser: true,
             disableAdminPasswordCheck: false,
             enableAddressPassword: false,
+            enableAgentEmailInfo: false,
+            enableRedeemCode: false,
+            redeemCodeUrl: '',
+            smtpImapProxyConfig: {
+                smtp: {
+                    host: '',
+                    port: 8025,
+                    starttls: false,
+                },
+                imap: {
+                    host: '',
+                    port: 11143,
+                    starttls: false,
+                },
+            },
             statusUrl: '',
             enableGlobalTurnstileCheck: false,
         })
@@ -72,14 +91,18 @@ export const useGlobalState = createGlobalState(
         const adminMailTabAddress = ref("");
         const adminSendBoxTabAddress = ref("");
         const mailboxSplitSize = useStorage('mailboxSplitSize', 0.25);
+        const mailListView = useStorage('mailListView', false);
+        const mailListPreviewLineClamp = useStorage('mailListPreviewLineClamp', 2);
         const useIframeShowMail = useStorage('useIframeShowMail', false);
         const preferShowTextMail = useStorage('preferShowTextMail', false);
         const userJwt = useStorage('userJwt', '');
+        const preferredLocale = useStorage('preferredLocale', '');
         const userTab = useSessionStorage('userTab', 'address_management');
         const indexTab = useSessionStorage('indexTab', 'mailbox');
         const globalTabplacement = useStorage('globalTabplacement', 'top');
         const useSideMargin = useStorage('useSideMargin', true);
         const useUTCDate = useStorage('useUTCDate', false);
+        const autoLoadRemoteImages = useStorage('autoLoadRemoteImages', true);
         const autoRefresh = useStorage('autoRefresh', false);
         const configAutoRefreshInterval = useStorage("configAutoRefreshInterval", 60);
         const userOpenSettings = ref({
@@ -143,9 +166,12 @@ export const useGlobalState = createGlobalState(
             adminMailTabAddress,
             adminSendBoxTabAddress,
             mailboxSplitSize,
+            mailListView,
+            mailListPreviewLineClamp,
             useIframeShowMail,
             preferShowTextMail,
             userJwt,
+            preferredLocale,
             userTab,
             indexTab,
             userOpenSettings,
@@ -153,6 +179,7 @@ export const useGlobalState = createGlobalState(
             globalTabplacement,
             useSideMargin,
             useUTCDate,
+            autoLoadRemoteImages,
             autoRefresh,
             configAutoRefreshInterval,
             telegramApp,

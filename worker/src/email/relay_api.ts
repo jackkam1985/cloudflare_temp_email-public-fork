@@ -3,6 +3,7 @@ import { Hono } from 'hono'
 import { triggerWebhook, triggerAnotherWorker, commonParseMail } from '../common'
 import { sendMailToTelegram } from '../telegram_api'
 import { extractEmailInfo } from './ai_extract'
+import { storeRawMail } from './storage'
 
 const api = new Hono<HonoCustomType>()
 
@@ -49,29 +50,33 @@ api.post('/external/api/relay_email', async (c) => {
 
     const parsedEmailContext: ParsedEmailContext = { rawEmail }
 
-    // --- Save to DB ---
+    // --- Save to DB (gzip / read-status aware, same storage path as the email worker) ---
+    let storedMailId: number | undefined
     try {
-        const { success } = await c.env.DB.prepare(
-            `INSERT INTO raw_mails (source, address, raw, message_id) VALUES (?, ?, ?, ?)`
-        ).bind(from, to, rawEmail, messageId).run()
+        const { success, meta } = await storeRawMail(c.env, from, to, messageId, rawEmail)
         if (!success) {
             console.error(`relay: failed to save message from ${from} to ${to}`)
+            return c.text('Failed to save email', 500)
         }
+        storedMailId = meta.last_row_id
     } catch (error) {
         console.error('relay: save email error', error)
         return c.text('Failed to save email', 500)
     }
 
+    // --- AI extraction (result is reused by telegram / webhook) ---
+    const aiExtractResult = await extractEmailInfo(parsedEmailContext, c.env, messageId, to)
+
     // --- Telegram notification ---
     try {
-        await sendMailToTelegram(c, to, parsedEmailContext, messageId)
+        await sendMailToTelegram(c, to, parsedEmailContext, messageId, aiExtractResult)
     } catch (error) {
         console.error('relay: telegram error', error)
     }
 
     // --- Webhook ---
     try {
-        await triggerWebhook(c, to, parsedEmailContext, messageId)
+        await triggerWebhook(c, to, parsedEmailContext, storedMailId, aiExtractResult)
     } catch (error) {
         console.error('relay: webhook error', error)
     }
@@ -90,9 +95,6 @@ api.post('/external/api/relay_email', async (c) => {
     } catch (error) {
         console.error('relay: another worker error', error)
     }
-
-    // --- AI extraction ---
-    await extractEmailInfo(parsedEmailContext, c.env, messageId, to)
 
     return c.json({ status: 'ok' })
 })

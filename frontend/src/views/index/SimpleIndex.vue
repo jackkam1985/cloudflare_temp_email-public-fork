@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useScopedI18n } from '@/i18n/app'
 import { useMessage } from 'naive-ui'
 import {
     ExitToAppFilled,
@@ -30,42 +30,7 @@ const showAccountSettingsCard = ref(false)
 const currentAutoRefreshInterval = ref(60)
 const timer = ref(null)
 
-const { t } = useI18n({
-    messages: {
-        en: {
-            exitSimpleIndex: 'Exit Simple',
-            copyAddress: 'Copy',
-            addressCopied: 'Address copied successfully',
-            refreshMails: 'Refresh',
-            noMails: 'No mails found',
-            prevPage: 'Previous',
-            nextPage: 'Next',
-            refreshSuccess: 'Mails refreshed successfully',
-            mailCount: '{current} / {total} emails',
-            accountSettings: "Account Settings",
-            addressCredential: 'Mail Address Credential',
-            addressCredentialTip: 'Please copy the Mail Address Credential and you can use it to login',
-            deleteSuccess: 'Mail deleted successfully',
-            refreshAfter: 'Refresh After {msg} Seconds',
-        },
-        zh: {
-            exitSimpleIndex: '退出极简',
-            copyAddress: '复制',
-            addressCopied: '地址复制成功',
-            refreshMails: '刷新',
-            noMails: '暂无邮件',
-            prevPage: '上一页',
-            nextPage: '下一页',
-            refreshSuccess: '邮件刷新成功',
-            mailCount: '{current} / {total} 封邮件',
-            accountSettings: "账户设置",
-            addressCredential: '邮箱地址凭证',
-            addressCredentialTip: '请复制邮箱地址凭证，你可以使用它登录你的邮箱。',
-            deleteSuccess: '邮件删除成功',
-            refreshAfter: '{msg}秒后刷新',
-        }
-    }
-})
+const { t } = useScopedI18n('views.index.SimpleIndex')
 
 // 复制地址
 const copyAddress = async () => {
@@ -88,6 +53,24 @@ const fetchMails = async () => {
     } catch (error) {
         console.error('Failed to fetch mails:', error)
         message.error('获取邮件失败')
+    }
+}
+
+const toggleCurrentMailUnread = async () => {
+    if (!currentMail.value || !openSettings.value.enableMailReadStatus) return
+    const mail = currentMail.value
+    const previousValue = mail.is_unread
+    const isUnread = previousValue !== 1
+    mail.is_unread = isUnread ? 1 : 0
+    try {
+        await api.fetch(`/api/mails/${mail.id}/read`, {
+            method: 'PATCH',
+            body: JSON.stringify({ isUnread }),
+            showLoading: false
+        })
+        message.success(t('readStatusUpdated'))
+    } catch {
+        mail.is_unread = previousValue
     }
 }
 
@@ -205,7 +188,7 @@ onBeforeUnmount(() => {
                                 <SettingsFilled />
                             </n-icon>
                         </template>
-                        {{ t('accountSettings') }}
+                        {{ t('mailboxSettings') }}
                     </n-button>
                 </n-flex>
                 <div v-if="isFirstPage" style="text-align: center; margin-top: 12px;">
@@ -217,7 +200,7 @@ onBeforeUnmount(() => {
 
             <!-- 账户设置卡片 -->
             <n-card v-if="showAccountSettingsCard" :bordered="false" embedded closable
-                @close="showAccountSettingsCard = false" :title="t('accountSettings')">
+                @close="showAccountSettingsCard = false" :title="t('mailboxSettings')">
                 <AccountSettings />
             </n-card>
 
@@ -251,10 +234,15 @@ onBeforeUnmount(() => {
                     <n-empty :description="t('noMails')" />
                 </div>
                 <div v-else>
-                    <h3 v-if="currentMail.subject">{{ currentMail.subject }}</h3>
+                    <h3 v-if="currentMail.subject"
+                        :class="{ 'mail-title-unread': openSettings.enableMailReadStatus && currentMail.is_unread === 1 }">
+                        {{ currentMail.subject }}
+                    </h3>
                     <div style="margin-top: 16px;">
                         <MailContentRenderer :mail="currentMail" :showEMailTo="false" :showReply="false"
                             :enableUserDeleteEmail="openSettings.enableUserDeleteEmail" :showSaveS3="false"
+                            :enableMailReadStatus="openSettings.enableMailReadStatus"
+                            :onUpdateMailReadStatus="toggleCurrentMailUnread"
                             :onDelete="deleteMail" />
                     </div>
                 </div>
@@ -280,5 +268,20 @@ onBeforeUnmount(() => {
 .n-card {
     margin-top: 20px;
     width: 100%;
+}
+
+.mail-title-unread {
+    font-weight: 700;
+}
+
+.mail-title-unread::before {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #2080f0;
+    content: '';
+    vertical-align: middle;
 }
 </style>

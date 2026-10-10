@@ -146,3 +146,6 @@ e2e/.e2e-pids
 # Bridge worker — never commit real credentials
 worker-bridge/scripts/accounts.yaml
 worker-bridge/scripts/__pycache__/
+
+# SMTP/IMAP proxy persisted IMAP flags (local dev / bare-metal runs)
+smtp_proxy_server/data/

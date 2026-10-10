@@ -49,6 +49,33 @@ print(response.json())
 
 **注意**：后端 API 已移除关键词过滤功能。如需按内容过滤邮件，请使用前端界面的过滤输入框，该功能可过滤当前显示的页面。
 
+## 邮件已读状态 API
+
+启用 `ENABLE_MAIL_READ_STATUS` 并升级数据库后可使用。历史邮件的 `is_unread` 为 `NULL`，视为已读；新邮件为 `1`。用户在网页邮件列表中点击未读邮件后会将其设为已读，也可以在邮件详情中手动切换状态；刷新页面不会自动标记：
+
+- `PATCH /api/mails/:id/read`：设置当前地址下单封邮件的状态，请求体为 `{ "isUnread": true }`（未读）或 `{ "isUnread": false }`（已读）
+
+## admin 获取单封邮件 API
+
+无需邮箱 JWT，通过邮件 ID 获取单封邮件，并使用 `x-admin-auth` 认证。
+返回结构与 `/admin/mails` 中的单条记录一致：gzip 压缩的原始邮件会解压到 `raw`，响应不包含 `raw_blob`。
+
+```python
+import requests
+
+mail_id = 1
+url = f"https://<你的worker地址>/admin/mails/{mail_id}"
+
+headers = {
+        "x-admin-auth": "<你的Admin密码>",
+        # "x-custom-auth": "<你的网站密码>", # 如果启用了私有站点密码
+    }
+
+response = requests.get(url, headers=headers)
+
+print(response.json())
+```
+
 ## admin 删除邮件 API
 
 通过邮件 ID 删除单封邮件。
@@ -130,6 +157,45 @@ print(response.json())
 ```
 
 ## user 邮件 API
+
+::: warning 注意：用户 JWT vs 地址 JWT
+此接口使用**用户 JWT**（通过 `/user_api/login` 或 `/user_api/register` 获得），使用 `x-user-token` header。
+
+**请勿与地址 JWT 混淆**：
+- 地址 JWT 使用 `Authorization: Bearer <jwt>` 访问 `/api/*` 接口
+- 用户 JWT 使用 `x-user-token: <jwt>` 访问 `/user_api/*` 接口
+:::
+
+### 用户绑定地址列表
+
+`GET /user_api/bind_address` 使用服务端分页，支持以下查询参数：
+
+未携带分页参数时返回默认第一页，不支持一次获取全部绑定地址。
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `limit` | `20` | 每页数量，范围为 1–100 |
+| `offset` | `0` | 分页偏移量 |
+| `query` | 空 | 可选，按邮箱地址关键字筛选当前用户已绑定的地址；最长 100 个字符，不可包含 `%` 或 `_`，非法查询返回 400 |
+
+响应中的 `results` 仅包含当前页。仅 `offset=0` 时查询筛选后的总数，后续页面的 `count` 为 `0`，客户端应保留第一页返回的总数。
+
+```python
+import requests
+
+url = "https://<你的worker地址>/user_api/bind_address"
+headers = {
+    "x-user-token": "<你的用户JWT Token>",
+}
+querystring = {
+    "limit": "20",
+    "offset": "0",
+}
+response = requests.get(url, headers=headers, params=querystring)
+print(response.json())
+```
+
+### 用户邮件列表
 
 支持 `address` 过滤
 

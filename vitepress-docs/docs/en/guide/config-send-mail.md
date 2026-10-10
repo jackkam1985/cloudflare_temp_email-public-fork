@@ -1,15 +1,58 @@
 
 # Configure Email Sending
 
-::: warning Note
-All three methods can be configured simultaneously. When sending emails, it will prioritize using `resend`, if `resend` is not configured, it will use `smtp`.
+::: tip Recommended
+Use Cloudflare `send_email` binding as the default send channel. Bind `SEND_MAIL` and finish Email Routing onboarding, then the Worker can send to any external address directly.
 
-If a Cloudflare authenticated forwarding email address is configured, CF's internal API will be prioritized for sending emails
+Workers Paid includes 3,000 messages/month, then $0.35 per 1,000 messages.
 :::
+
+## Send Channel Priority
+
+Each `/api/send_mail` request matches channels in order; **the first hit sends**:
+
+| Order | Condition | Channel | Deducts balance |
+|-------|-----------|---------|----------------|
+| 1 | `SEND_MAIL` bound **AND** recipient in `verifiedAddressList` | Cloudflare binding (compat mode) | No |
+| 2 | `RESEND_TOKEN` or `RESEND_TOKEN_<DOMAIN>` set | Resend API | Yes |
+| 3 | `SMTP_CONFIG` has entry for current domain | worker-mailer SMTP | Yes |
+| 4 | `SEND_MAIL` bound (none of the above) | **Cloudflare binding (recommended primary)** | Yes |
+| — | None of the above | Throws | — |
+
+> [!NOTE]
+> Binding send failures return an error directly.
+
+## Using the Cloudflare `send_email` Binding (Recommended)
+
+Only available when deploying via CLI. Add to `wrangler.toml`:
+
+```toml
+# Send emails via the Cloudflare send_email binding
+send_email = [
+   { name = "SEND_MAIL" },
+]
+```
+
+> [!warning] Important
+> The binding name must be `SEND_MAIL` — different from Cloudflare's official `SEND_EMAIL` example.
+
+After the following steps, you can send to any external address directly:
+
+1. Enable Email Routing on the domain in the Cloudflare Dashboard and complete onboarding
+2. Add the `send_email` binding shown above to `wrangler.toml`
+3. Deploy the Worker
+
+No additional env var is required.
 
 ## Send Emails Using Resend
 
 Register at `https://resend.com/domains` and add DNS records according to the instructions.
+
+> [!WARNING] DNS record proxy status on Cloudflare
+> Resend domain verification CNAME records **must be set to DNS-only** (gray cloud) in
+> the Cloudflare DNS dashboard. Proxied (orange cloud) records will prevent Resend from
+> completing verification, and a single failed attempt can take several hours before
+> Retry becomes available. See [#515](https://github.com/dreamhunter2333/cloudflare_temp_email/issues/515).
 
 Create an `api key` on the `API KEYS` page.
 
@@ -35,12 +78,18 @@ wrangler secret put RESEND_TOKEN_DREAMHUNTER2333_XYZ
 
 ## Send Emails Using SMTP
 
-The format of `SMTP_CONFIG` is as follows, where key is the domain name and value is the SMTP configuration. For SMTP configuration format details, refer to [zou-yu/worker-mailer](https://github.com/zou-yu/worker-mailer/blob/main/README_zh-CN.md)
+The format of `SMTP_CONFIG` is as follows. **The key must be your own sending domain**, and the value is the SMTP configuration.
+
+For SMTP configuration format details, refer to [zou-yu/worker-mailer](https://github.com/zou-yu/worker-mailer/blob/main/README_zh-CN.md)
+
+> [!warning] Important
+> The JSON key (e.g. `your-domain.com` in the example below) must be replaced with **your own domain** — the domain configured in your `DOMAINS` variable.
+> This is one of the most common configuration mistakes. Do not copy the example domain directly.
 
 ```json
 {
-    "awsl.uk": {
-        "host": "smtp.xxx.com",
+    "your-domain.com": {
+        "host": "smtp.example.com",
         "port": 465,
         "secure": true,
         "authType": [
@@ -48,9 +97,42 @@ The format of `SMTP_CONFIG` is as follows, where key is the domain name and valu
             "login"
         ],
         "credentials": {
-            "username": "username",
-            "password": "password"
+            "username": "your-smtp-username",
+            "password": "your-smtp-password"
         }
+    }
+}
+```
+
+**Field Reference:**
+
+| Field | Description |
+|-------|-------------|
+| key (e.g. `your-domain.com`) | Your sending domain, must match a domain configured in `DOMAINS` |
+| `host` | SMTP server address, e.g. `smtp.mailgun.org`, `smtp.gmail.com`, or your self-hosted SMTP server |
+| `port` | SMTP port, typically `465` (SSL) or `587` (STARTTLS) |
+| `secure` | Whether to use SSL/TLS. Set to `true` for port 465, `false` for port 587 |
+| `authType` | Authentication method, typically `["plain", "login"]` |
+| `credentials.username` | SMTP server login username |
+| `credentials.password` | SMTP server login password |
+
+If you have **multiple domains** using different SMTP services, add multiple keys in the same JSON:
+
+```json
+{
+    "domain-a.com": {
+        "host": "smtp.mailgun.org",
+        "port": 465,
+        "secure": true,
+        "authType": ["plain", "login"],
+        "credentials": { "username": "user@domain-a.com", "password": "xxx" }
+    },
+    "domain-b.com": {
+        "host": "smtp.gmail.com",
+        "port": 465,
+        "secure": true,
+        "authType": ["plain", "login"],
+        "credentials": { "username": "user@gmail.com", "password": "app-password" }
     }
 }
 ```
@@ -68,17 +150,48 @@ cd worker
 wrangler secret put SMTP_CONFIG
 ```
 
+## User Accounts, Mailboxes, Email Addresses, and Send Permission
+
+These concepts are related, but they identify different objects:
+
+| Concept | Description |
+|---------|-------------|
+| User account | Signs in to the user center and can link and manage multiple mailboxes. The account email is not automatically a sending or receiving address |
+| Mailbox | The user-facing object that contains an inbox, sent mail, sending capability, and mailbox settings |
+| Email address | The concrete value that identifies a mailbox, such as `name@example.com`. The current mailbox is authenticated by its Address JWT |
+| Send permission and balance | Permission and balance records in `address_sender` are managed independently **per email address**; user roles configured by `NO_LIMIT_SEND_ROLE` can bypass address balance checks |
+
+Multiple email addresses bound to the same user account therefore do not share send permission or balance. To request permission for an address:
+
+1. Switch to the mailbox that needs to send mail
+2. Open the **Send Mail** page
+3. Click **Request Access**
+
+The request affects only the address selected at that time. After switching to another address, check that address's own balance and request permission separately if needed. An email address can also hold send permission without being bound to a user account.
+
+## Send Balance Mechanism
+
+An email address needs its own send balance to send emails. The balance mechanism works as follows:
+
+1. **Auto-initialize Default Quota**: When `DEFAULT_SEND_BALANCE > 0`, the system automatically initializes the default quota when the user opens the send page or calls the send-mail API for the first time
+2. **Manual Request**: If `DEFAULT_SEND_BALANCE = 0`, switch to the target email address in the frontend and click **Request Access** to create a pending send-access record for the current address
+3. **Unlimited Sending**: The following methods can bypass balance checks:
+   - Add the address to the "No Limit Send Address List" in the admin console
+   - Configure the `NO_LIMIT_SEND_ROLE` environment variable to specify roles that can send without limits
+
+> [!NOTE]
+> `DEFAULT_SEND_BALANCE` only inserts an initial quota for addresses that do not yet have an `address_sender` row (`ON CONFLICT DO NOTHING`); existing rows — including admin-disabled or admin-edited ones — are never modified by the runtime path. Restoring a previously disabled or pre-existing address must go through the admin console (enable + set balance).
+>
+> Layer 1 (`verifiedAddressList` hit) does not deduct balance, but it still counts toward send limits; layers 2/3/4 all deduct balance.
+>
+> Send limits apply to **all** send channels, including admin send endpoints.
+>
+> Daily and monthly windows are calculated in **UTC**.
+>
+> The current limit implementation is a **soft guard**. It is suitable for routine quota control, but it should not be treated as a strict hard-stop cost gate under database errors or high concurrency.
+
 ## Send Emails to Authenticated Forwarding Addresses on Cloudflare
 
-Only supported for CLI deployment, add `send_email` configuration in `wrangler.toml`.
+Typical use case: non-onboarded domains or Workers free-tier users.
 
-The destination email address must be an authenticated email address on Cloudflare, which has significant limitations. If you need to send emails to other addresses, you can use `resend` or `smtp` to send emails.
-
-```toml
-# Send emails through Cloudflare
-send_email = [
-   { name = "SEND_MAIL" },
-]
-```
-
-Admin console account configuration `Verified address list (can send emails through CF internal API)`
+In this compatibility mode, mail is sent via `SEND_MAIL` binding only when the recipient is in the admin `Verified Address List`.

@@ -1,11 +1,15 @@
 import { LocaleMessages } from "./type";
 
 const messages: LocaleMessages = {
+    InvalidRequestBodyMsg: "无效的请求体",
+    InvalidMailIdMsg: "无效的邮件 ID",
+    MailNotFoundMsg: "邮件不存在",
     CustomAuthPasswordMsg: "你已启用私有站点密码,请提供密码",
     UserTokenExpiredMsg: "您的令牌已过期, 请重新登录",
     UserAcceesTokenExpiredMsg: "您的访问令牌已过期, 请刷新页面",
     UserRoleIsNotAdminMsg: "您的用户角色不是管理员, 无权访问",
     NeedAdminPasswordMsg: "您需要提供管理员密码才能访问此页面",
+    AdminApiIpNotAllowedMsg: "当前 IP 不在管理员白名单中",
 
     KVNotAvailableMsg: "KV 不可用, 请联系管理员",
     DBNotAvailableMsg: "DB 不可用, 请联系管理员",
@@ -20,6 +24,10 @@ const messages: LocaleMessages = {
     InvalidAddressMsg: "无效的邮箱地址",
     InvalidAddressCredentialMsg: "无效的邮箱地址凭据",
     UserDeleteEmailDisabledMsg: "用户删除邮箱/邮件已禁用, 请联系管理员",
+
+    RedeemCodeUnavailableMsg: "兑换码无效、已使用或已过期",
+    RedeemCodeInvalidMsg: "兑换码配置无效",
+    RedeemRoleConflictMsg: "当前用户已有其他角色，无法兑换",
 
     UserNotFoundMsg: "用户不存在",
     UserAlreadyExistsMsg: "用户已存在, 请登录",
@@ -57,6 +65,7 @@ const messages: LocaleMessages = {
     NameTooShortMsg: "名称太短",
     NameTooLongMsg: "名称太长",
     InvalidDomainMsg: "无效的域名",
+    RandomSubdomainNotAllowedMsg: "当前域名未启用随机子域名",
     AddressAlreadyExistsMsg: "邮箱地址已存在",
     MaxAddressCountReachedMsg: "已达到最大地址数量限制",
     AddressNotBindedMsg: "邮箱地址未绑定",
@@ -70,15 +79,19 @@ const messages: LocaleMessages = {
     ContentEmptyMsg: "内容不能为空",
     AlreadyRequestedMsg: "已经申请过了",
     EnableResendOrSmtpMsg: "请先为此域名启用 resend 或 smtp",
-    EnableResendOrSmtpWithVerifiedMsg: "请先为此域名启用 resend 或 smtp，或将收件人添加到已验证地址列表",
+    EnableResendOrSmtpOrSendMailMsg: "请先为此域名启用 resend、smtp 或 SEND_MAIL",
+    ServerSendMailDailyLimitMsg: "服务器今日发信次数已达上限",
+    ServerSendMailMonthlyLimitMsg: "服务器本月发信次数已达上限",
     InvalidToMailMsg: "收件人地址无效",
 
     // Admin related
     InvalidAddressIdMsg: "无效的 address_id",
     EnableKVMsg: "请先启用 KV",
     EnableSendMailMsg: "请先启用 SEND_MAIL",
+    EnableSendMailForDomainMsg: "请先为此域名启用 SEND_MAIL",
     InvalidCleanupConfigMsg: "无效的 cleanType 或 cleanDays",
     InvalidCleanTypeMsg: "无效的 cleanType",
+    CleanupFailedMsg: "清理失败，请检查清理配置；禁用地址活跃时间更新时，无法按不活跃时间清理。",
     EnableKVForMailVerifyMsg: "如果要启用邮件验证，请先启用 KV",
     VerifyMailDomainInvalidMsg: "验证邮件发送者域名必须在",
     InvalidMaxAddressCountMsg: "无效的 maxAddressCount",
@@ -170,6 +183,12 @@ const messages: LocaleMessages = {
     TgNoPermissionViewMailMsg: "无权查看此邮件",
     TgBotTokenRequiredMsg: "需要设置 TELEGRAM_BOT_TOKEN",
     TgLangFeatureDisabledMsg: "语言设置功能已禁用，使用系统默认语言",
+    TgAiExtractResultMsg: "AI 提取",
+    TgAiExtractAuthCodeMsg: "验证码",
+    TgAiExtractAuthLinkMsg: "验证链接",
+    TgAiExtractServiceLinkMsg: "服务链接",
+    TgAiExtractSubscriptionLinkMsg: "订阅链接",
+    TgAiExtractOtherLinkMsg: "其他链接",
 }
 
 export default messages;

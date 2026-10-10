@@ -9,6 +9,12 @@ Refer to [Deploy Worker](/en/guide/cli/worker#deploy-worker-with-frontend-option
 
 ## Separate Frontend and Backend Deployment
 
+> [!warning] Important: SPA Mode
+> This project is a Single-Page Application (SPA). If you deploy manually via the Cloudflare dashboard, **you must set "Not Found handling" to `Single-page application (SPA)` in the advanced options**, otherwise refreshing the page or directly accessing sub-paths like `/admin` will return a 404 error.
+> When deploying via CLI (`wrangler pages deploy`), this is handled automatically and no extra configuration is needed.
+>
+> ![pages spa setting](/ui_install/pages-spa-setting.jpg)
+
 The first deployment will prompt you to create a project. For the `production` branch, enter `production`.
 
 ```bash
@@ -22,6 +28,12 @@ Modify the `.env.prod` file.
 Change `VITE_API_BASE` to the `worker` `url` created in the previous step. Do not add `/` at the end.
 
 For example: `VITE_API_BASE=https://xxx.xxx.workers.dev`
+
+Set the frontend default language with `VITE_DEFAULT_LANG`. Supported values are `zh`, `en`, `es`, `pt-BR`, `ja`, and `de`; an unset or invalid value falls back to `zh`.
+
+For example: `VITE_DEFAULT_LANG=en`
+
+See [Frontend Variables](/en/guide/frontend-vars) for other settings.
 
 ```bash
 pnpm build --emptyOutDir
@@ -40,6 +52,8 @@ Forwarding requests from page functions to the worker backend can achieve faster
 The first deployment will prompt you to create a project. For the `production` branch, enter `production`.
 
 If your worker backend name is not `cloudflare_temp_email`, please modify `pages/wrangler.toml`.
+
+To set the default language, add `VITE_DEFAULT_LANG=en` to `frontend/.env.pages.local`. Same-origin requests do not require `VITE_API_BASE`; see [Frontend Variables](/en/guide/frontend-vars) for other settings.
 
 ```bash
 cd frontend

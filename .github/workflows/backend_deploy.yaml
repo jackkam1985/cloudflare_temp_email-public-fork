@@ -21,9 +21,9 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         name: Install pnpm
         id: pnpm-install
         with:
@@ -67,11 +67,12 @@ jobs:
           if [ "$debug_mode" = "true" ]; then
             pnpm run deploy
           else
-            output=$(pnpm run deploy 2>&1)
-            if [ $? -ne 0 ]; then
-                code=$?
-                echo "Command failed with exit code $code"
-                exit $code
+            if pnpm run deploy >/dev/null 2>&1; then
+              echo "Deploy succeeded"
+            else
+              code=$?
+              echo "Command failed with exit code $code"
+              exit "$code"
             fi
           fi
           echo "Deployed for tag ${{ github.ref_name }}"

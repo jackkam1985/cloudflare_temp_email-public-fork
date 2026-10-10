@@ -49,6 +49,33 @@ print(response.json())
 
 **Note**: Keyword filtering has been removed from the backend API. If you need to filter emails by content, please use the frontend filter input in the UI, which filters the currently displayed page.
 
+## Mail Read Status API
+
+Enable `ENABLE_MAIL_READ_STATUS` and upgrade the database first. Historical mail has `is_unread = NULL` and is treated as read; new mail has `is_unread = 1`. Opening unread mail from the web mail list marks it as read, and its detail view can switch the state manually. Refreshing the page does not mark it as read:
+
+- `PATCH /api/mails/:id/read`: set one mail belonging to the current address; use `{ "isUnread": true }` for unread or `{ "isUnread": false }` for read
+
+## Admin Get Mail API
+
+Fetch a single mail by mail ID without a mailbox JWT. Authenticate with `x-admin-auth`.
+The response matches one entry returned by `/admin/mails`: gzip-compressed raw content is decompressed into `raw`, and `raw_blob` is excluded.
+
+```python
+import requests
+
+mail_id = 1
+url = f"https://<your-worker-address>/admin/mails/{mail_id}"
+
+headers = {
+        "x-admin-auth": "<your-Admin-password>",
+        # "x-custom-auth": "<your-website-password>", # If private site password is enabled
+    }
+
+response = requests.get(url, headers=headers)
+
+print(response.json())
+```
+
 ## Admin Delete Mail API
 
 Delete a single mail by mail ID.
@@ -130,6 +157,45 @@ print(response.json())
 ```
 
 ## User Mail API
+
+::: warning Note: User JWT vs Address JWT
+This endpoint uses **User JWT** (obtained via `/user_api/login` or `/user_api/register`), with `x-user-token` header.
+
+**Do not confuse with Address JWT**:
+- Address JWT uses `Authorization: Bearer <jwt>` to access `/api/*` endpoints
+- User JWT uses `x-user-token: <jwt>` to access `/user_api/*` endpoints
+:::
+
+### Bound Address List
+
+`GET /user_api/bind_address` uses server-side pagination and accepts these query parameters:
+
+Requests without pagination parameters return the default first page. Fetching all bound addresses in one request is not supported.
+
+| Parameter | Default | Description |
+| --- | --- | --- |
+| `limit` | `20` | Page size, from 1 to 100 |
+| `offset` | `0` | Pagination offset |
+| `query` | Empty | Optional email address keyword filter for the current user's bound addresses; at most 100 characters, without `%` or `_` (invalid queries return 400) |
+
+The `results` array contains only the current page. The filtered total is queried only when `offset=0`; later pages return `count: 0`, so clients should retain the total from the first page.
+
+```python
+import requests
+
+url = "https://<your-worker-address>/user_api/bind_address"
+headers = {
+    "x-user-token": "<your-user-JWT-token>",
+}
+querystring = {
+    "limit": "20",
+    "offset": "0",
+}
+response = requests.get(url, headers=headers, params=querystring)
+print(response.json())
+```
+
+### User Mail List
 
 Supports `address` filter
 

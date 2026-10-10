@@ -1,45 +1,17 @@
 <script setup>
-import { ref } from "vue";
-import { useI18n } from 'vue-i18n'
-import { CloudDownloadRound, ReplyFilled, ForwardFilled, FullscreenRound } from '@vicons/material'
+import { ref, computed, watch } from "vue";
+import { useScopedI18n } from '@/i18n/app'
+import { CloudDownloadRound, ReplyFilled, ForwardFilled, FullscreenRound, ImageRound } from '@vicons/material'
 import ShadowHtmlComponent from "./ShadowHtmlComponent.vue";
 import AiExtractInfo from "./AiExtractInfo.vue";
 import { getDownloadEmlUrl } from '../utils/email-parser';
+import { blockRemoteContent } from '../utils/remote-content-policy';
 import { utcToLocalDate } from '../utils';
 import { useGlobalState } from '../store';
 
-const { preferShowTextMail, useIframeShowMail, useUTCDate, isDark } = useGlobalState();
+const { preferShowTextMail, useIframeShowMail, useUTCDate, isDark, autoLoadRemoteImages } = useGlobalState();
 
-const { t } = useI18n({
-  messages: {
-    en: {
-      delete: 'Delete',
-      deleteMailTip: 'Are you sure you want to delete mail?',
-      attachments: 'View Attachments',
-      downloadMail: 'Download Mail',
-      reply: 'Reply',
-      forward: 'Forward',
-      showTextMail: 'Show Text Mail',
-      showHtmlMail: 'Show HTML Mail',
-      saveToS3: 'Save to S3',
-      size: 'Size',
-      fullscreen: 'Fullscreen',
-    },
-    zh: {
-      delete: '删除',
-      deleteMailTip: '确定要删除邮件吗?',
-      attachments: '查看附件',
-      downloadMail: '下载邮件',
-      reply: '回复',
-      forward: '转发',
-      showTextMail: '显示纯文本邮件',
-      showHtmlMail: '显示HTML邮件',
-      saveToS3: '保存到S3',
-      size: '大小',
-      fullscreen: '全屏',
-    }
-  }
-});
+const { t } = useScopedI18n('components.MailContentRenderer')
 
 const props = defineProps({
   mail: {
@@ -62,6 +34,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  enableMailReadStatus: {
+    type: Boolean,
+    default: false
+  },
   // 回调函数 props
   onDelete: {
     type: Function,
@@ -78,6 +54,10 @@ const props = defineProps({
   onSaveToS3: {
     type: Function,
     default: () => { }
+  },
+  onUpdateMailReadStatus: {
+    type: Function,
+    default: () => { }
   }
 });
 
@@ -85,7 +65,28 @@ const showTextMail = ref(preferShowTextMail.value);
 const showAttachments = ref(false);
 const curAttachments = ref([]);
 const attachmentLoding = ref(false);
+const readStatusUpdating = ref(false);
 const showFullscreen = ref(false);
+
+// Per-mail consent, deliberately independent of the global setting: it only
+// ever turns true when the user clicks "load images" for this specific mail,
+// and resets when a different mail is shown.
+const showRemoteImages = ref(false);
+watch(() => props.mail.id, () => {
+  showRemoteImages.value = false;
+});
+
+const processedMail = computed(() => {
+  if (autoLoadRemoteImages.value || showRemoteImages.value) {
+    return { message: props.mail.message, blocked: 0 };
+  }
+  const { html, blocked } = blockRemoteContent(props.mail.message);
+  return { message: html, blocked };
+});
+
+const handleLoadRemoteImages = () => {
+  showRemoteImages.value = true;
+};
 
 const handleDelete = () => {
   props.onDelete();
@@ -102,6 +103,15 @@ const handleReply = () => {
 
 const handleForward = () => {
   props.onForward();
+};
+
+const handleUpdateMailReadStatus = async () => {
+  readStatusUpdating.value = true;
+  try {
+    await props.onUpdateMailReadStatus();
+  } finally {
+    readStatusUpdating.value = false;
+  }
 };
 
 
@@ -146,6 +156,11 @@ const handleSaveToS3 = async (filename, blob) => {
         {{ t('attachments') }}
       </n-button>
 
+      <n-button v-if="enableMailReadStatus" size="small" tertiary type="info" :loading="readStatusUpdating"
+        @click="handleUpdateMailReadStatus">
+        {{ mail.is_unread === 1 ? t('markAsRead') : t('markAsUnread') }}
+      </n-button>
+
       <n-button tag="a" target="_blank" tertiary type="info" size="small" :download="mail.id + '.eml'"
         :href="getDownloadEmlUrl(mail.raw)">
         <template #icon>
@@ -178,7 +193,22 @@ const handleSaveToS3 = async (filename, blob) => {
         </template>
         {{ t('fullscreen') }}
       </n-button>
+
     </n-space>
+
+    <!-- 外部资源阻断提示 -->
+    <n-alert v-if="processedMail.blocked" type="warning" :show-icon="false" :bordered="false"
+      class="remote-images-banner">
+      <n-space align="center" justify="space-between">
+        <span>{{ t('remoteImagesBlocked', { count: processedMail.blocked }) }}</span>
+        <n-button size="tiny" tertiary type="warning" @click="handleLoadRemoteImages">
+          <template #icon>
+            <n-icon :component="ImageRound" />
+          </template>
+          {{ t('loadRemoteImages') }}
+        </n-button>
+      </n-space>
+    </n-alert>
 
     <!-- AI 提取信息 -->
     <AiExtractInfo :metadata="mail.metadata" />
@@ -186,9 +216,9 @@ const handleSaveToS3 = async (filename, blob) => {
     <!-- 邮件内容 -->
     <div class="mail-content" :class="{ 'dark-mode': isDark }">
       <pre v-if="showTextMail" class="mail-text">{{ mail.text }}</pre>
-      <iframe v-else-if="useIframeShowMail" :srcdoc="mail.message" class="mail-iframe">
+      <iframe v-else-if="useIframeShowMail" :srcdoc="processedMail.message" class="mail-iframe">
       </iframe>
-      <ShadowHtmlComponent v-else :key="mail.id" :htmlContent="mail.message" :isDark="isDark" class="mail-html" />
+      <ShadowHtmlComponent v-else :key="mail.id" :htmlContent="processedMail.message" :isDark="isDark" class="mail-html" />
     </div>
   </div>
 
@@ -197,9 +227,9 @@ const handleSaveToS3 = async (filename, blob) => {
     <n-drawer-content :title="mail.subject" closable>
       <div class="fullscreen-mail-content" :class="{ 'dark-mode': isDark }">
         <pre v-if="showTextMail" class="mail-text">{{ mail.text }}</pre>
-        <iframe v-else-if="useIframeShowMail" :srcdoc="mail.message" class="mail-iframe">
+        <iframe v-else-if="useIframeShowMail" :srcdoc="processedMail.message" class="mail-iframe">
         </iframe>
-        <ShadowHtmlComponent v-else :key="mail.id" :htmlContent="mail.message" :isDark="isDark" class="mail-html" />
+        <ShadowHtmlComponent v-else :key="mail.id" :htmlContent="processedMail.message" :isDark="isDark" class="mail-html" />
       </div>
     </n-drawer-content>
   </n-drawer>
@@ -242,6 +272,11 @@ const handleSaveToS3 = async (filename, blob) => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Let the banner's inner space fill the alert so the button sits on the right. */
+.remote-images-banner :deep(.n-space) {
+  width: 100%;
 }
 
 .mail-content {

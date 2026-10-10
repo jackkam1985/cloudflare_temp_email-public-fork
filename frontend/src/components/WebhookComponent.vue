@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, h } from 'vue'
-import { useI18n } from 'vue-i18n'
+import { useScopedI18n } from '@/i18n/app'
 import type { DropdownOption } from 'naive-ui'
 
 const props = defineProps({
@@ -24,30 +24,7 @@ const props = defineProps({
 // @ts-ignore
 const message = useMessage()
 
-const { t } = useI18n({
-    messages: {
-        en: {
-            successTip: 'Success',
-            test: 'Test',
-            save: 'Save',
-            notEnabled: 'Webhook is not enabled for you',
-            urlMissing: 'URL is required',
-            enable: 'Enable',
-            presets: 'Presets',
-            fillInDemoTip: 'Please modify the URL and other settings to your own',
-        },
-        zh: {
-            successTip: '成功',
-            test: '测试',
-            save: '保存',
-            notEnabled: 'Webhook 未开启，请联系管理员开启',
-            urlMissing: 'URL 不能为空',
-            enable: '启用',
-            presets: '示例模板',
-            fillInDemoTip: '请修改URL和其他设置为您自己的配置',
-        }
-    }
-});
+const { t } = useScopedI18n('components.WebhookComponent')
 
 class WebhookSettings {
     enabled: boolean = false
@@ -186,6 +163,10 @@ const handlePresetSelect = (key: number) => {
 
 const webhookSettings = ref<WebhookSettings>(new WebhookSettings())
 const enableWebhook = ref(false)
+const showTestModal = ref(false)
+const testMode = ref('random')
+const testMailId = ref<number | null>(null)
+const testing = ref(false)
 
 const fetchData = async () => {
     try {
@@ -211,15 +192,27 @@ const saveSettings = async () => {
 }
 
 const testSettings = async () => {
+    if (testing.value) return
     if (!webhookSettings.value.url) {
         message.error(t('urlMissing'))
         return
     }
+    if (testMode.value === 'specified' && (!Number.isSafeInteger(testMailId.value) || (testMailId.value ?? 0) <= 0)) {
+        message.error(t('invalidMailId'))
+        return
+    }
+    testing.value = true
     try {
-        await props.testSettings(webhookSettings.value)
+        await props.testSettings({
+            ...webhookSettings.value,
+            ...(testMode.value === 'specified' ? { mail_id: testMailId.value } : {}),
+        })
         message.success(t('successTip'))
+        showTestModal.value = false
     } catch (error) {
         message.error((error as Error).message || "error");
+    } finally {
+        testing.value = false
     }
 }
 
@@ -237,7 +230,7 @@ onMounted(async () => {
                         {{ t('presets') }}
                     </n-button>
                 </n-dropdown>
-                <n-button v-if="webhookSettings.enabled" @click="testSettings" secondary>
+                <n-button v-if="webhookSettings.enabled" @click="showTestModal = true" secondary>
                     {{ t('test') }}
                 </n-button>
                 <n-button @click="saveSettings" type="primary">
@@ -265,6 +258,27 @@ onMounted(async () => {
             </div>
         </n-card>
         <n-result v-else status="404" :title="t('notEnabled')" />
+        <n-modal v-model:show="showTestModal" preset="card" :title="t('test')"
+            style="width: min(420px, calc(100vw - 32px))" :mask-closable="!testing"
+            :close-on-esc="!testing" :closable="!testing">
+            <n-radio-group v-model:value="testMode" :disabled="testing">
+                <n-space>
+                    <n-radio value="random">{{ t('randomMail') }}</n-radio>
+                    <n-radio value="specified">{{ t('specifiedMail') }}</n-radio>
+                </n-space>
+            </n-radio-group>
+            <n-form-item v-if="testMode === 'specified'" :label="t('mailId')" style="margin-top: 16px">
+                <n-input-number v-model:value="testMailId" :min="1" :max="Number.MAX_SAFE_INTEGER"
+                    :precision="0" :show-button="false" :disabled="testing" :placeholder="t('mailId')"
+                    style="width: 100%" />
+            </n-form-item>
+            <template #footer>
+                <n-flex justify="end">
+                    <n-button :disabled="testing" @click="showTestModal = false">{{ t('cancel') }}</n-button>
+                    <n-button type="primary" :loading="testing" @click="testSettings">{{ t('test') }}</n-button>
+                </n-flex>
+            </template>
+        </n-modal>
     </div>
 </template>
 

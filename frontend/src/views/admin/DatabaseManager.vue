@@ -1,50 +1,98 @@
 <script setup>
-import { ref, onMounted } from 'vue';
-import { useI18n } from 'vue-i18n'
+import { computed, ref, onMounted } from 'vue';
+import { useScopedI18n } from '@/i18n/app'
 import { CleaningServicesFilled } from '@vicons/material'
 
 import { api } from '../../api'
 import { init } from 'vooks/lib/on-fonts-ready';
 
 const message = useMessage()
+const D1_STORAGE_PLAN_CONFIG_KEY = 'd1_storage_plan'
 const dbVersionData = ref({
     need_initialization: false,
     need_migration: false,
     current_db_version: '',
-    code_db_version: ''
+    code_db_version: '',
+    database_size: null
+})
+const selectedPlan = ref(null)
+const savedPlan = ref(null)
+const savingPlan = ref(false)
+
+const planOptions = computed(() => [
+    {
+        label: t('free_plan'),
+        value: 'free',
+        databaseLimit: 500 * 1024 ** 2
+    },
+    {
+        label: t('paid_plan'),
+        value: 'paid',
+        databaseLimit: 10 * 1024 ** 3
+    }
+])
+
+const selectedPlanDetails = computed(() => (
+    planOptions.value.find((plan) => plan.value === selectedPlan.value)
+))
+
+const storagePercentage = computed(() => {
+    if (!selectedPlanDetails.value || dbVersionData.value.database_size === null) return 0
+    return dbVersionData.value.database_size / selectedPlanDetails.value.databaseLimit * 100
 })
 
-const { t } = useI18n({
-    messages: {
-        en: {
-            need_initialization_tip: 'Database initialization is required. Please initialize the database.',
-            need_migration_tip: 'Database migration is required. Please migrate the database.',
-            current_db_version: 'Current DB Version',
-            code_db_version: 'Code Needed DB Version',
-            init: 'Initialize Database',
-            migration: 'Migrate Database',
-            initializationSuccess: 'Database initialized successfully',
-            migrationSuccess: 'Database migrated successfully',
-        },
-        zh: {
-            need_initialization_tip: '需要初始化数据库，请初始化数据库',
-            need_migration_tip: '需要迁移数据库，请迁移数据库',
-            current_db_version: '当前数据库版本',
-            code_db_version: '需要的数据库版本',
-            init: '初始化数据库',
-            migration: '升级数据库 Schema',
-            initializationSuccess: '数据库初始化成功',
-            migrationSuccess: '数据库升级成功',
-        }
-    }
-});
+const progressPercentage = computed(() => Math.min(storagePercentage.value, 100))
+
+const progressStatus = computed(() => {
+    if (storagePercentage.value >= 90) return 'error'
+    if (storagePercentage.value >= 75) return 'warning'
+    return 'success'
+})
+
+const { t } = useScopedI18n('views.admin.DatabaseManager')
+
+const formatBytes = (bytes) => {
+    if (bytes === null || bytes === undefined) return t('unavailable')
+    if (bytes === 0) return '0 B'
+
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    const unitIndex = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1)
+    const value = bytes / 1024 ** unitIndex
+    return `${value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2)} ${units[unitIndex]}`
+}
 
 const fetchData = async () => {
     try {
-        const res = await api.fetch('/admin/db_version');
-        if (res) Object.assign(dbVersionData.value, res);
+        const [versionRes, configRes] = await Promise.all([
+            api.fetch('/admin/db_version'),
+            api.fetch(`/admin/config/${D1_STORAGE_PLAN_CONFIG_KEY}`)
+        ]);
+        if (versionRes) Object.assign(dbVersionData.value, versionRes);
+
+        const configuredPlan = configRes?.value
+        if (planOptions.value.some((plan) => plan.value === configuredPlan)) {
+            selectedPlan.value = configuredPlan
+            savedPlan.value = configuredPlan
+        }
     } catch (error) {
         message.error(error.message || "error");
+    }
+}
+
+const savePlan = async (plan) => {
+    savingPlan.value = true
+    try {
+        await api.fetch('/admin/config', {
+            method: 'POST',
+            body: { key: D1_STORAGE_PLAN_CONFIG_KEY, value: plan }
+        })
+        savedPlan.value = plan
+        message.success(t('planSaved'))
+    } catch (error) {
+        selectedPlan.value = savedPlan.value
+        message.error(error.message || "error")
+    } finally {
+        savingPlan.value = false
     }
 }
 
@@ -100,6 +148,58 @@ onMounted(async () => {
                 </span>
             </n-alert>
 
+            <div class="storage-panel">
+                <div class="storage-heading">
+                    <div>
+                        <h3>{{ t('storage_title') }}</h3>
+                        <p>{{ t('storage_description') }}</p>
+                    </div>
+                    <div class="plan-select">
+                        <span>{{ t('plan') }}</span>
+                        <n-select
+                            v-model:value="selectedPlan"
+                            :options="planOptions"
+                            :placeholder="t('plan_placeholder')"
+                            :disabled="dbVersionData.need_initialization"
+                            :loading="savingPlan"
+                            @update:value="savePlan"
+                        />
+                    </div>
+                </div>
+
+                <n-grid cols="1 s:2" responsive="screen" :x-gap="12" :y-gap="12">
+                    <n-grid-item>
+                        <div class="storage-stat">
+                            <span>{{ t('current_database_size') }}</span>
+                            <strong>{{ formatBytes(dbVersionData.database_size) }}</strong>
+                        </div>
+                    </n-grid-item>
+                    <n-grid-item>
+                        <div class="storage-stat">
+                            <span>{{ t('single_database_limit') }}</span>
+                            <strong>{{ selectedPlanDetails ? formatBytes(selectedPlanDetails.databaseLimit) : '—' }}</strong>
+                        </div>
+                    </n-grid-item>
+                </n-grid>
+
+                <div v-if="selectedPlanDetails" class="storage-progress">
+                    <div class="storage-progress-label">
+                        <span>{{ t('storage_usage') }}</span>
+                        <span>{{ storagePercentage.toFixed(2) }}%</span>
+                    </div>
+                    <n-progress
+                        type="line"
+                        :percentage="progressPercentage"
+                        :status="progressStatus"
+                        :show-indicator="false"
+                    />
+                </div>
+
+                <n-alert class="storage-tip" type="default" :show-icon="false" :bordered="false">
+                    {{ t('storage_tip') }}
+                </n-alert>
+            </div>
+
         </n-card>
     </div>
 </template>
@@ -122,5 +222,89 @@ onMounted(async () => {
 
 .n-button {
     margin-top: 10px;
+}
+
+.storage-panel {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--n-border-color);
+    text-align: left;
+}
+
+.storage-heading {
+    display: flex;
+    gap: 24px;
+    align-items: flex-end;
+    justify-content: space-between;
+    margin-bottom: 16px;
+}
+
+.storage-heading h3,
+.storage-heading p {
+    margin: 0;
+}
+
+.storage-heading p {
+    margin-top: 4px;
+    color: var(--n-text-color-3);
+}
+
+.plan-select {
+    width: 220px;
+}
+
+.plan-select > span {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--n-text-color-2);
+}
+
+.storage-stat {
+    display: flex;
+    min-height: 72px;
+    padding: 14px;
+    box-sizing: border-box;
+    flex-direction: column;
+    justify-content: space-between;
+    border: 1px solid var(--n-border-color);
+    border-radius: var(--n-border-radius);
+}
+
+.storage-stat span {
+    color: var(--n-text-color-3);
+}
+
+.storage-stat strong {
+    margin-top: 8px;
+    font-size: 18px;
+    color: var(--n-text-color);
+}
+
+.storage-progress {
+    margin-top: 16px;
+}
+
+.storage-progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    color: var(--n-text-color-2);
+}
+
+.storage-tip {
+    margin-top: 16px;
+    margin-bottom: 0;
+}
+
+@media (max-width: 640px) {
+    .storage-heading {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .plan-select {
+        width: 100%;
+    }
 }
 </style>

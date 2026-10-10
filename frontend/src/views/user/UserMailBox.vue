@@ -1,24 +1,15 @@
 <script setup>
 import { onMounted, ref, watch } from 'vue';
-import { useI18n } from 'vue-i18n'
+import { useScopedI18n } from '@/i18n/app'
 
 import { api } from '../../api'
+import { useGlobalState } from '../../store'
 import MailBox from '../../components/MailBox.vue';
 
 const message = useMessage()
+const { openSettings } = useGlobalState()
 
-const { t } = useI18n({
-    messages: {
-        en: {
-            addressQueryTip: 'Leave blank to query all addresses',
-            query: 'Query',
-        },
-        zh: {
-            addressQueryTip: '留空查询所有地址',
-            query: '查询',
-        }
-    }
-});
+const { t } = useScopedI18n('views.user.UserMailBox')
 
 const mailBoxKey = ref("")
 const addressFilter = ref();
@@ -41,7 +32,7 @@ const fetchMailData = async (limit, offset) => {
 const fetchAddresData = async () => {
     try {
         const { results } = await api.fetch(
-            `/user_api/bind_address`
+            `/user_api/bind_address?limit=100&offset=0`
         );
         addressFilterOptions.value = results.map((item) => {
             return {
@@ -78,7 +69,7 @@ onMounted(() => {
             </n-button>
         </n-input-group>
         <div style="margin-top: 10px;"></div>
-        <MailBox :key="mailBoxKey" :enableUserDeleteEmail="true" :fetchMailData="fetchMailData"
+        <MailBox :key="mailBoxKey" :enableUserDeleteEmail="openSettings.enableUserDeleteEmail" :fetchMailData="fetchMailData"
             :deleteMail="deleteMail" :showFilterInput="true" />
     </div>
 </template>

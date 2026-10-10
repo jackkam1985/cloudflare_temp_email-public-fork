@@ -1,5 +1,5 @@
 <script setup>
-import { useI18n } from 'vue-i18n'
+import { useScopedI18n } from '@/i18n/app'
 
 import { useGlobalState } from '../store'
 
@@ -8,27 +8,14 @@ import UserSettingsPage from './user/UserSettings.vue';
 import UserBar from './user/UserBar.vue';
 import BindAddress from './user/BindAddress.vue';
 import UserMailBox from './user/UserMailBox.vue';
+import UserSendBox from './user/UserSendBox.vue';
 
 const {
-    userTab, globalTabplacement, userSettings
+    userTab, globalTabplacement, userSettings, openSettings
 } = useGlobalState()
 
-const { t } = useI18n({
-    messages: {
-        en: {
-            address_management: 'Address Management',
-            user_mail_box_tab: 'Mail Box',
-            user_settings: 'User Settings',
-            bind_address: 'Bind Mail Address',
-        },
-        zh: {
-            address_management: '地址管理',
-            user_mail_box_tab: '收件箱',
-            user_settings: '用户设置',
-            bind_address: '绑定邮箱地址',
-        }
-    }
-});
+const { t } = useScopedI18n('views.User')
+const { t: userMailT } = useScopedI18n('views.user.UserSendBox')
 
 </script>
 
@@ -41,6 +28,12 @@ const { t } = useI18n({
             </n-tab-pane>
             <n-tab-pane name="user_mail_box_tab" :tab="t('user_mail_box_tab')">
                 <UserMailBox />
+            </n-tab-pane>
+            <n-tab-pane v-if="openSettings.enableSendMail" name="user_sendbox" :tab="userMailT('sendbox')">
+                <UserSendBox mode="sendbox" />
+            </n-tab-pane>
+            <n-tab-pane v-if="openSettings.enableSendMail" name="user_send_mail" :tab="t('send_mail')">
+                <UserSendBox mode="send_mail" @sent="userTab = 'user_sendbox'" />
             </n-tab-pane>
             <n-tab-pane name="user_settings" :tab="t('user_settings')">
                 <UserSettingsPage />
