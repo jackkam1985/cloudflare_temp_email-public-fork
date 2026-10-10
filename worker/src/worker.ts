@@ -59,7 +59,7 @@ app.use('/*', async (c, next) => {
 	const passwords = getPasswords(c);
 	if (!c.req.path.startsWith("/open_api")
 		&& !c.req.path.startsWith("/telegram/")
-		&& !c.req.path.startsWith("/external/")
+		&& !c.req.path.startsWith("/external/api/relay_email")
 		&& passwords && passwords.length > 0
 	) {
 		const auth = c.req.raw.headers.get("x-custom-auth");
